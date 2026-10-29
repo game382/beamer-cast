@@ -38,6 +38,9 @@ video{width:100%;border-radius:10px;background:#000;margin-top:10px}
 <div class="card"><h2>2 · Quality</h2>
   <select id="q"><option value="720">720p · 30 fps (light)</option><option value="1080" selected>1080p · 30 fps</option>
   <option value="1080-60">1080p · 60 fps</option><option value="2160">4K · 30 fps (heavy)</option></select>
+  <div style="margin-top:12px"><label for="cap" style="color:var(--silver)">Capture method</label>
+    <select id="cap"><option value="browser">Browser tab (quiet PC, tab sound)</option><option value="native">Native screen (Quick Sync, video only)</option></select>
+    <small id="capnote" style="display:block;color:var(--silver);margin-top:4px"></small></div>
   <label style="display:block;margin-top:12px;cursor:pointer"><input type="checkbox" id="ll" style="accent-color:#BB0000;width:18px;height:18px;vertical-align:middle">
     Low latency <b>(beta)</b><small style="display:block;color:var(--silver)">Aims for under ~1 s delay on LG and Fire TV. Chromecast always uses regular streaming (HLS). Falls back to HLS automatically if a TV can't do it.</small></label>
   <div style="margin-top:8px;font-size:14px"><a href="/clock" target="_blank" style="color:var(--silver)">Open the latency test clock</a></div>
@@ -51,8 +54,16 @@ video{width:100%;border-radius:10px;background:#000;margin-top:10px}
 const $=id=>document.getElementById(id), log=h=>$('log').innerHTML=h, add=h=>$('log').innerHTML+='<br>'+h;
 const Q={'720':{h:720,fps:30,bps:3e6},'1080':{h:1080,fps:30,bps:6e6},'1080-60':{h:1080,fps:60,bps:9e6},'2160':{h:2160,fps:30,bps:2e7}};
 let ws,rec,stream;
-fetch('/api/settings').then(r=>r.json()).then(s=>{$('ll').checked=!!s.low_latency;}).catch(()=>{});
-$('ll').onchange=()=>fetch('/api/settings',{method:'POST',body:JSON.stringify({low_latency:$('ll').checked})});
+const saveSettings=o=>fetch('/api/settings',{method:'POST',body:JSON.stringify(o)});
+fetch('/api/settings').then(r=>r.json()).then(s=>{$('ll').checked=!!s.low_latency;$('cap').value=s.capture||'browser';capNote();}).catch(()=>{});
+let caps=null;
+async function capNote(){
+  if($('cap').value!=='native'){$('capnote').textContent='';return;}
+  caps=caps||await(await fetch('/api/native/caps')).json();
+  $('capnote').textContent=!caps.ddagrab?"This PC's ffmpeg can't capture the screen; Beamer will use the browser method.":caps.qsv?'Captures your whole screen with Intel Quick Sync. Video only for now.':'Captures your whole screen (no Quick Sync found: software encoding). Video only for now.';
+}
+$('cap').onchange=()=>{saveSettings({capture:$('cap').value});capNote();};
+$('ll').onchange=()=>saveSettings({low_latency:$('ll').checked});
 async function loadTVs(r){
   $('tvs').textContent='Searching your network...';
   const d=await(await fetch('/api/tvs'+(r?'?refresh=1':''))).json();
@@ -72,6 +83,13 @@ $('go').onclick=async()=>{
   const picked=[...document.querySelectorAll('#tvs input:checked')].map(i=>i.value);
   if(!picked.length){log('Tick at least one TV first.');return;}
   const cfg=Q[$('q').value];
+  if($('cap').value==='native'){
+    const nll=$('ll').checked;
+    ws=new WebSocket(`ws://${location.host}/native?dev=${encodeURIComponent(picked.join(','))}&q=${$('q').value}&ll=${nll?1:0}`);
+    ws.onmessage=e=>add(e.data.startsWith('OK')?'<span class="ok">'+e.data+'</span>':e.data.startsWith('FAILED')?'<span class="bad">'+e.data+'</span>':e.data);
+    log('Starting native screen capture ('+(nll?'low latency beta':'HLS')+')...');
+    return;
+  }
   stream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:cfg.fps,height:{ideal:cfg.h}},audio:{suppressLocalAudioPlayback:true},systemAudio:'exclude'});
   $('v').srcObject=stream;
   const ll=$('ll').checked;
