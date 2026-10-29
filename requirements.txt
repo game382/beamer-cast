@@ -2,3 +2,5 @@ aiohttp>=3.9
 aiowebostv>=0.4
 pychromecast>=14
 zeroconf>=0.130
+pystray>=0.19
+pillow>=10

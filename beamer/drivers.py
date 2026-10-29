@@ -6,7 +6,7 @@ TV records are plain dicts: {id, kind, name, host, model, ...}. kind: lg | fire 
   cast  Chromecast / Google TV: real Cast protocol, default receiver plays the HLS stream
   roku  discovered but NOT supported yet (no browser; see README)
 """
-import asyncio, socket, time, urllib.request
+import asyncio, socket, subprocess, time, urllib.request
 import xml.etree.ElementTree as ET
 
 from . import config
@@ -103,7 +103,8 @@ async def pair_lg(host, timeout=90):
 # ---------- Fire TV (adb) ----------
 async def _adb(*args):
     exe = await asyncio.get_running_loop().run_in_executor(None, config.ensure_tool, "adb")
-    p = await asyncio.create_subprocess_exec(exe, *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+    p = await asyncio.create_subprocess_exec(exe, *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+                                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     out, _ = await asyncio.wait_for(p.communicate(), 25)
     return out.decode(errors="ignore").strip()
 

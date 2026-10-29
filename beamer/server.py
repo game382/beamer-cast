@@ -122,12 +122,3 @@ def make_app():
         web.get("/hls/{p:.*}", hls_file),
     ])
     return app
-
-
-def run(open_browser=True):
-    import webbrowser
-    HLS.mkdir(exist_ok=True)
-    if open_browser:
-        webbrowser.open(f"http://localhost:{PORT}")
-    web.run_app(make_app(), host="0.0.0.0", port=PORT,
-                print=lambda *_: print(f"Beamer is running at http://localhost:{PORT}  (close this window to quit)"))

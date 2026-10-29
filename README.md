@@ -19,8 +19,9 @@ stream that the TV plays. Several TVs can play the same stream at once.
 
 ## Install
 
-Download **`Beamer-Setup.exe`** from the Releases page and run it. Beamer opens in your browser at
-`http://localhost:8765`.
+Download **`Beamer-Setup.exe`** from the Releases page and run it (it asks for administrator permission once, to
+add a firewall rule limited to your home network). Beamer opens in your browser at `http://localhost:8765` and keeps
+running as a **system-tray icon**: double-click it to reopen the page, right-click for **Quit Beamer**.
 
 On first use Beamer downloads `ffmpeg` (and `adb`, only if you add a Fire TV) into `%APPDATA%\Beamer\tools`.
 Your PC and the TVs must be on the same home network.
@@ -28,8 +29,9 @@ Your PC and the TVs must be on the same home network.
 ### From source
 
 ```
-pip install -r requirements.txt
-python -m beamer
+python -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\python -m beamer
 ```
 
 ## Using it
@@ -65,12 +67,13 @@ LG via the webOS remote protocol, Fire TV via `adb`, Chromecast via Cast. See `b
 ## Build the installer
 
 ```
-pip install -r requirements-dev.txt
-scripts\build.ps1
+.venv\Scripts\pip install -r requirements-dev.txt
+scripts\build.ps1                                          # build only
+scripts\release.ps1 -Version 0.1.3 -Notes "what changed"   # bump, build, tag, publish a GitHub release
 ```
 
-Needs [Inno Setup 6](https://jrsoftware.org/isinfo.php) for the installer; without it you still get a portable
-folder in `dist\Beamer`.
+Needs [Inno Setup 6](https://jrsoftware.org/isinfo.php) for the installer and the GitHub CLI for releases.
+See [CLAUDE.md](CLAUDE.md) for the project layout and rules, and [CHANGELOG.md](CHANGELOG.md) for history.
 
 ## License
 

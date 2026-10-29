@@ -1,6 +1,6 @@
 import sys
 
-from .server import run
+from .app import main
 
 if __name__ == "__main__":
-    run(open_browser="--no-browser" not in sys.argv)
+    main(open_browser="--no-browser" not in sys.argv)

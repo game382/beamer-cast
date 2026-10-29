@@ -1,7 +1,7 @@
 """Entry point for the packaged app."""
 import sys
 
-from beamer.server import run
+from beamer.app import main
 
 if __name__ == "__main__":
-    run(open_browser="--no-browser" not in sys.argv)
+    main(open_browser="--no-browser" not in sys.argv)
