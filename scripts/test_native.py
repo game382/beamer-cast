@@ -14,9 +14,10 @@ async def main():
     server = subprocess.Popen([sys.executable, "-m", "beamer", "--no-browser"], cwd=ROOT, env=env,
                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     await asyncio.sleep(4)
+    tone = subprocess.Popen(['ffplay', '-nodisp', '-loglevel', 'quiet', '-autoexit', '-t', str(SECS + 6), '-volume', '15', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000'])
     chunks, msgs = [], []
     async with aiohttp.ClientSession() as s:
-        ctl = await s.ws_connect(f"ws://127.0.0.1:{PORT}/native?ll=1&q=1080&dev=", max_msg_size=0)
+        ctl = await s.ws_connect(f"ws://127.0.0.1:{PORT}/native?ll=1&q=1080&dev=&snd=1&mute=0", max_msg_size=0)
         t0 = time.time()
         await asyncio.sleep(3)
         live = await s.ws_connect(f"ws://127.0.0.1:{PORT}/live", max_msg_size=0)
@@ -38,6 +39,7 @@ async def main():
                 break
         await ctl.close()
     await asyncio.sleep(1)
+    tone.kill()
     server.terminate()
     out = server.communicate(timeout=10)[0]
     print("---- server log ----\n" + "\n".join(l for l in out.splitlines() if l.strip()))
@@ -54,6 +56,10 @@ async def main():
     pr = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,width,height,r_frame_rate",
                          "-of", "csv=p=0", str(f)], capture_output=True, text=True)
     print("video stream:", pr.stdout.strip())
+    ap = subprocess.run(["ffmpeg", "-v", "info", "-i", str(f), "-vn", "-af", "volumedetect", "-f", "null", "-"], capture_output=True, text=True)
+    print("audio:", [l.split("]")[-1].strip() for l in ap.stderr.splitlines() if "mean_volume" in l or "max_volume" in l or "Audio:" in l])
+    st = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_type,start_time", "-of", "csv=p=0", str(f)], capture_output=True, text=True)
+    print("stream start times (a/v offset):", st.stdout.split())
     f.unlink(missing_ok=True)
     fl = pathlib.Path(os.environ["APPDATA"]) / "Beamer" / "ffmpeg.log"
     print("---- ffmpeg.log ----\n" + fl.read_text(errors="ignore")[-800:])

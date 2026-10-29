@@ -32,13 +32,17 @@ def lan_ip(host):
     return ip
 
 
-def ffmpeg_command(ffmpeg, height, fps, rate, low_latency, native=None):
+def ffmpeg_command(ffmpeg, height, fps, rate, low_latency, native=None, audio=None):
     """One encode, two outputs when low latency is on: HLS files (Chromecast / fallback) + MPEG-TS on stdout.
     native=None reads browser WebM from stdin; native={'qsv': bool} captures the screen directly."""
     cmd = [ffmpeg, "-loglevel", "warning"]
     if native is not None:
         vf, enc = nativecap.video_args(fps, rate, height, native["qsv"])
-        cmd += nativecap.source_args(fps, native["qsv"]) + ["-vf", vf, "-r", str(fps)] + enc + ["-an"]
+        cmd += nativecap.source_args(fps, native["qsv"])
+        if audio is not None:          # all inputs first, then the output options
+            cmd += nativecap.audio_input_args(audio)
+        cmd += ["-vf", vf, "-r", str(fps)] + enc
+        cmd += ["-c:a", "aac", "-b:a", "128k", "-af", "aresample=async=1000"] if audio is not None else ["-an"]
     else:
         if low_latency:
             cmd += ["-flags", "low_delay", "-probesize", "1000000", "-analyzeduration", "1000000"]
@@ -52,7 +56,7 @@ def ffmpeg_command(ffmpeg, height, fps, rate, low_latency, native=None):
     if not low_latency:
         return cmd + ["-f", "hls", "-hls_time", "1", "-hls_list_size", "6",
                       "-hls_flags", "delete_segments+independent_segments", "live.m3u8"]
-    maps = ["-map", "0:v:0"] + ([] if native is not None else ["-map", "0:a:0?"])
+    maps = ["-map", "0:v:0"] + (["-map", "1:a:0"] if audio is not None else [] if native is not None else ["-map", "0:a:0?"])
     return cmd + maps + ["-flush_packets", "1", "-muxdelay", "0", "-f", "tee",
                   f"[f=hls:{hls}]live.m3u8|[f=mpegts:max_delay=0:flush_packets=1:mpegts_flags=+resend_headers]pipe\\:1"]
 
@@ -74,6 +78,7 @@ async def _run_session(req, ws, native=None):
     height, fps, rate = QUALITY.get(req.query.get("q", "1080"), QUALITY["1080"])
     low_latency = req.query.get("ll") == "1"
     loop = asyncio.get_running_loop()
+    audio, cleanup = None, []
     try:
         ffmpeg = await loop.run_in_executor(None, config.ensure_tool, "ffmpeg")
     except Exception as e:
@@ -85,17 +90,29 @@ async def _run_session(req, ws, native=None):
             await ws.send_str("FAILED: this ffmpeg can't capture the screen (no ddagrab); use the browser tab method")
             return
         native = {"qsv": caps["qsv"]}
+        if req.query.get("snd") == "1":
+            try:
+                audio = nativecap.AudioFeeder()
+                audio.start()
+                cleanup.append(audio.stop)
+                if req.query.get("mute") == "1":
+                    cleanup.append(nativecap.mute_pc())
+            except Exception as e:
+                log("PC sound unavailable:", repr(e))
+                await ws.send_str(f"INFO: PC sound unavailable ({e}); casting video only")
+                audio = None
     shutil.rmtree(HLS, ignore_errors=True)
     HLS.mkdir(parents=True)
     hub.reset()
     ff_log = open(config.APP_DIR / "ffmpeg.log", "w")
     ff = subprocess.Popen(
-        ffmpeg_command(ffmpeg, height, fps, rate, low_latency, native), cwd=HLS,
+        ffmpeg_command(ffmpeg, height, fps, rate, low_latency, native, audio), cwd=HLS,
         stdin=subprocess.PIPE if native is None else subprocess.DEVNULL,
         stdout=subprocess.PIPE if low_latency else subprocess.DEVNULL,
         stderr=ff_log, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     state["ffmpeg"] = ff
-    how = "browser tab" if native is None else f"native screen ({'Quick Sync' if native['qsv'] else 'software x264'})"
+    how = "browser tab" if native is None else (f"native screen ({'Quick Sync' if native['qsv'] else 'software x264'}"
+                                                 f"{', PC sound' + (', PC muted' if cleanup and len(cleanup) > 1 else '') if audio else ', no sound'})")
     log(f"session start: {how}, {height}p{fps} {rate}, {'low-latency (MPEG-TS over WebSocket + HLS)' if low_latency else 'HLS'}")
     if low_latency:
         threading.Thread(target=_pump_stdout, args=(ff, loop), daemon=True).start()
@@ -131,7 +148,7 @@ async def _run_session(req, ws, native=None):
         elif native is not None:
             pass          # nothing expected from the page; closing the socket ends the session
     # (native sessions poll for the playlist below)
-    return ff, ff_log
+    return ff, ff_log, cleanup
 
 
 async def ws_handler(req):
@@ -154,7 +171,7 @@ async def native_handler(req):
     return ws
 
 
-async def _end_session(ff, ff_log):
+async def _end_session(ff, ff_log, cleanup=()):
     try:
         if ff.stdin:
             ff.stdin.close()
@@ -162,6 +179,11 @@ async def _end_session(ff, ff_log):
         pass
     ff.terminate()
     ff_log.close()
+    for fn in reversed(list(cleanup)):          # stop audio capture, unmute the PC
+        try:
+            fn()
+        except Exception as e:
+            log("cleanup failed:", repr(e))
     log("session end")
 
 
@@ -235,10 +257,14 @@ async def settings_handler(req):
         body = await req.json()
         if "low_latency" in body:
             cfg["low_latency"] = bool(body["low_latency"])
+        for k in ("native_sound", "native_mute"):
+            if k in body:
+                cfg[k] = bool(body[k])
         if body.get("capture") in ("browser", "native"):
             cfg["capture"] = body["capture"]
         config.save(cfg)
-    return web.json_response({"low_latency": bool(cfg.get("low_latency", False)), "capture": cfg.get("capture", "browser")})
+    return web.json_response({"low_latency": bool(cfg.get("low_latency", False)), "capture": cfg.get("capture", "browser"),
+                              "native_sound": bool(cfg.get("native_sound", True)), "native_mute": bool(cfg.get("native_mute", True))})
 
 
 async def native_caps_handler(req):

@@ -4,3 +4,5 @@ pychromecast>=14
 zeroconf>=0.130
 pystray>=0.19
 pillow>=10
+pyaudiowpatch>=0.2.12
+pycaw>=20240210

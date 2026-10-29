@@ -3,7 +3,7 @@ import asyncio, os, socket, sys, threading, webbrowser
 
 from aiohttp import web
 
-from . import config
+from . import config, native
 from .server import ASSETS, HLS, PORT, make_app, state
 
 
@@ -29,6 +29,10 @@ def main(open_browser=True):
         webbrowser.open(url)
         return
     HLS.mkdir(exist_ok=True)
+    try:
+        native.recover_mute()          # a crashed run may have left the PC muted
+    except Exception as e:
+        print("mute recovery failed:", repr(e), flush=True)
 
     loop = asyncio.new_event_loop()
     box = {}
