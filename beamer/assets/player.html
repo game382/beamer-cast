@@ -1,0 +1,35 @@
+<!doctype html><meta charset="utf-8"><title>Beamer</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+html,body{margin:0;background:#000;height:100%;overflow:hidden}
+video{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+/* Invisible full-page button, kept focused: the remote's OK key becomes a real click, which browsers need for sound + fullscreen. */
+#b{position:fixed;inset:0;width:100%;height:100%;opacity:0;border:0;background:transparent;z-index:5}
+#msg{position:fixed;left:0;right:0;bottom:6%;text-align:center;color:#fff;font:28px system-ui,sans-serif;z-index:6;text-shadow:0 0 6px #000}
+#msg b{color:#fff;background:#BB0000;padding:6px 16px;border-radius:8px}
+</style>
+<video id="v" autoplay playsinline></video>
+<button id="b" autofocus></button>
+<div id="msg"><b>Beamer</b>&nbsp; Press OK on the remote for sound + full screen</div>
+<script src="/hls.min.js"></script>
+<script>
+const src='/hls/live.m3u8', v=document.getElementById('v'), b=document.getElementById('b'), msg=document.getElementById('msg');
+function start(){
+  if (window.Hls && Hls.isSupported()) {
+    const h=new Hls({liveSyncDurationCount:2, lowLatencyMode:false});
+    h.loadSource(src); h.attachMedia(v);
+    h.on(Hls.Events.ERROR,(e,d)=>{ if(d.fatal){ h.destroy(); setTimeout(start,1500);} });
+  } else { v.src=src; }
+  v.play().catch(()=>{ v.muted=true; v.play().catch(()=>{}); });
+}
+start();
+function gesture(){
+  v.muted=false; v.volume=1;
+  if (v.paused) v.play().catch(()=>{});
+  const el=document.documentElement, fs=el.requestFullscreen||el.webkitRequestFullscreen||el.mozRequestFullScreen;
+  if (fs && !document.fullscreenElement) { try{ fs.call(el); }catch(e){} }
+  msg.style.display='none';
+}
+b.addEventListener('click',gesture); addEventListener('keydown',gesture); addEventListener('click',gesture);
+b.focus(); setInterval(()=>b.focus(),1000);
+</script>

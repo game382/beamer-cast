@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Beamer">
+  <rect width="256" height="256" rx="56" fill="#BB0000"/>
+  <rect x="44" y="56" width="168" height="112" rx="16" fill="#9E0000" stroke="#FFFFFF" stroke-width="12"/>
+  <path d="M128 174v22M94 204h68" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="78" cy="138" r="9" fill="#FFFFFF"/>
+  <path d="M78 114a24 24 0 0 1 24 24M78 92a46 46 0 0 1 46 46M78 70a68 68 0 0 1 68 68" fill="none" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round"/>
+</svg>

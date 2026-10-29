@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+build/
+dist/
+*.spec.bak
+# never commit per-user settings, TV pairing keys or credentials
+config.json
+*_key.json
+*creds*.json
+credentials.json
+devices.json
+pin*.txt
+*.log

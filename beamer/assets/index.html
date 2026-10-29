@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Beamer</title><link rel="icon" href="/logo.png">
+<style>
+:root{--scarlet:#BB0000;--scarlet-dark:#9E0000;--gray:#666666;--silver:#A7B1B7;--bg:#0f0f10;--card:#1a1a1c;--line:#34363a;--text:#fff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,Segoe UI,sans-serif}
+header{background:var(--scarlet);display:flex;align-items:center;gap:14px;padding:14px max(16px,calc(50% - 300px));box-shadow:0 2px 12px #0008}
+header img{width:44px;height:44px;border-radius:10px}
+header h1{margin:0;font-size:26px;letter-spacing:.5px} header small{color:#ffd9d9;display:block;font-size:13px}
+main{max-width:600px;margin:0 auto;padding:20px 16px 60px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+h2{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:1.5px;color:var(--silver)}
+label.tv{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;cursor:pointer}
+label.tv:hover{border-color:var(--gray)} label.tv.off{opacity:.45;cursor:not-allowed}
+label.tv input{accent-color:var(--scarlet);width:18px;height:18px}
+label.tv small{color:var(--silver);display:block}
+button,select,input[type=text]{font:inherit;color:var(--text);background:#232326;border:1px solid var(--gray);border-radius:9px;padding:9px 14px}
+button{cursor:pointer} button:hover{border-color:var(--silver)}
+button.primary{background:var(--scarlet);border-color:var(--scarlet);font-weight:600} button.primary:hover{background:var(--scarlet-dark)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+#log{color:var(--silver);font-size:14px;min-height:1.4em} #log b{color:#fff}
+video{width:100%;border-radius:10px;background:#000;margin-top:10px}
+.ok{color:#7ddc8a}.bad{color:#ff7b7b}
+</style></head><body>
+<header><img src="/logo.png" alt=""><div><h1>Beamer</h1><small>Beam any browser tab to your TVs</small></div></header>
+<main>
+<div class="card"><h2>1 · Choose TVs</h2>
+  <div id="tvs">Searching your network...</div>
+  <div class="row"><button id="refresh">Refresh</button><button id="addbtn">+ Add a TV by address</button></div>
+  <div id="addbox" style="display:none;margin-top:12px" class="row">
+    <select id="addkind"><option value="lg">LG webOS</option><option value="fire">Amazon Fire TV</option><option value="cast">Chromecast / Google TV</option></select>
+    <input type="text" id="addhost" placeholder="TV IP, e.g. 192.168.1.20" size="22">
+    <button id="adddo" class="primary">Add</button>
+    <div id="addmsg" style="flex-basis:100%;color:var(--silver);font-size:14px"></div>
+  </div>
+</div>
+<div class="card"><h2>2 · Quality</h2>
+  <select id="q"><option value="720">720p · 30 fps (light)</option><option value="1080" selected>1080p · 30 fps</option>
+  <option value="1080-60">1080p · 60 fps</option><option value="2160">4K · 30 fps (heavy)</option></select>
+</div>
+<div class="card"><h2>3 · Beam it</h2>
+  <div class="row"><button id="go" class="primary">Share tab / screen</button><button id="stop">Stop</button></div>
+  <p id="log">Idle. Tip: share a single <b>Chrome tab</b> with <b>tab audio</b> on, so your PC stays quiet and the TV plays the sound.</p>
+  <video id="v" muted autoplay></video>
+</div></main>
+<script>
+const $=id=>document.getElementById(id), log=h=>$('log').innerHTML=h, add=h=>$('log').innerHTML+='<br>'+h;
+const Q={'720':{h:720,fps:30,bps:3e6},'1080':{h:1080,fps:30,bps:6e6},'1080-60':{h:1080,fps:60,bps:9e6},'2160':{h:2160,fps:30,bps:2e7}};
+let ws,rec,stream;
+async function loadTVs(r){
+  $('tvs').textContent='Searching your network...';
+  const d=await(await fetch('/api/tvs'+(r?'?refresh=1':''))).json();
+  $('tvs').innerHTML=d.map(x=>`<label class="tv ${x.supported?'':'off'}"><input type="checkbox" value="${x.id}" ${x.supported?'':'disabled'}>
+    <span>${x.name}<small>${x.kind.toUpperCase()}${x.model?' · '+x.model:''}${x.supported?'':' · not supported yet'}</small></span></label>`).join('')||'No TVs found. Use "Add a TV by address".';
+}
+$('refresh').onclick=()=>loadTVs(true); loadTVs(false);
+$('addbtn').onclick=()=>$('addbox').style.display='flex';
+$('adddo').onclick=async()=>{
+  const kind=$('addkind').value, host=$('addhost').value.trim(); if(!host) return;
+  $('addmsg').textContent = kind==='lg' ? 'Watch the TV: tap Allow on the pairing prompt...' : kind==='fire' ? 'Connecting (accept the prompt on the TV if it appears)...' : 'Connecting...';
+  const r=await(await fetch('/api/tvs/add',{method:'POST',body:JSON.stringify({kind,host})})).json();
+  $('addmsg').innerHTML=r.ok?'<span class="ok">Added '+r.tv.name+'</span>':'<span class="bad">'+r.error+'</span>';
+  if(r.ok) loadTVs(true);
+};
+$('go').onclick=async()=>{
+  const picked=[...document.querySelectorAll('#tvs input:checked')].map(i=>i.value);
+  if(!picked.length){log('Tick at least one TV first.');return;}
+  const cfg=Q[$('q').value];
+  stream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:cfg.fps,height:{ideal:cfg.h}},audio:{suppressLocalAudioPlayback:true},systemAudio:'exclude'});
+  $('v').srcObject=stream;
+  ws=new WebSocket(`ws://${location.host}/ws?dev=${encodeURIComponent(picked.join(','))}&q=${$('q').value}`);
+  ws.onopen=()=>{rec=new MediaRecorder(stream,{mimeType:'video/webm;codecs=vp8,opus',videoBitsPerSecond:cfg.bps});
+    rec.ondataavailable=e=>e.data.size&&ws.send(e.data);rec.start(250);log('Streaming... sending to your TVs.');};
+  ws.onmessage=e=>add(e.data.startsWith('OK')?'<span class="ok">'+e.data+'</span>':e.data.startsWith('FAILED')?'<span class="bad">'+e.data+'</span>':e.data);
+  stream.getVideoTracks()[0].onended=()=>$('stop').click();
+};
+$('stop').onclick=()=>{try{rec.stop()}catch{}try{stream.getTracks().forEach(t=>t.stop())}catch{}try{ws.close()}catch{}log('Stopped.');};
+</script></body></html>
