@@ -60,6 +60,8 @@ async def main():
     print("audio:", [l.split("]")[-1].strip() for l in ap.stderr.splitlines() if "mean_volume" in l or "max_volume" in l or "Audio:" in l])
     st = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_type,start_time", "-of", "csv=p=0", str(f)], capture_output=True, text=True)
     print("stream start times (a/v offset):", st.stdout.split())
+    n = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-count_packets", "-show_entries", "stream=nb_read_packets", "-of", "csv=p=0", str(f)], capture_output=True, text=True)
+    print(f"video frames received: {n.stdout.strip()} in {SECS:.0f}s (expect ~{SECS*30:.0f} at 30 fps, even on a still screen)")
     f.unlink(missing_ok=True)
     fl = pathlib.Path(os.environ["APPDATA"]) / "Beamer" / "ffmpeg.log"
     print("---- ffmpeg.log ----\n" + fl.read_text(errors="ignore")[-800:])

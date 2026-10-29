@@ -41,7 +41,7 @@ def ffmpeg_command(ffmpeg, height, fps, rate, low_latency, native=None, audio=No
         cmd += nativecap.source_args(fps, native["qsv"])
         if audio is not None:          # all inputs first, then the output options
             cmd += nativecap.audio_input_args(audio)
-        cmd += ["-vf", vf, "-r", str(fps)] + enc
+        cmd += ["-vf", vf, "-r", str(fps), "-fps_mode", "cfr"] + enc
         cmd += ["-c:a", "aac", "-b:a", "128k", "-af", "aresample=async=1000"] if audio is not None else ["-an"]
     else:
         if low_latency:

@@ -69,10 +69,11 @@ function startLowLatency() {
 
   // no frames within ~5 s -> HLS
   const t0 = Date.now();
-  let lastReport = 0;
+  let lastReport = 0, started = false;
   llTimer = setInterval(() => {
     const age = Date.now() - t0;
-    if (age >= 5000 && !(v.readyState >= 2 && v.currentTime > 0)) { fallback('no frames within 5 s (readyState ' + v.readyState + ', t=' + v.currentTime.toFixed(2) + ', paused=' + v.paused + ', muted=' + v.muted + ', size=' + v.videoWidth + 'x' + v.videoHeight + ', buffered=' + JSON.stringify(Array.from({length: v.buffered.length}, (_, i) => [+v.buffered.start(i).toFixed(2), +v.buffered.end(i).toFixed(2)])) + ', stats=' + JSON.stringify(mp && mp.statisticsInfo || {}) + ')'); return; }
+    if (v.readyState >= 2 && v.currentTime > 0) started = true;       // the 5 s test is for startup only
+    if (!started && age >= 5000) { fallback('no frames within 5 s (readyState ' + v.readyState + ', t=' + v.currentTime.toFixed(2) + ', paused=' + v.paused + ', muted=' + v.muted + ', size=' + v.videoWidth + 'x' + v.videoHeight + ', buffered=' + JSON.stringify(Array.from({length: v.buffered.length}, (_, i) => [+v.buffered.start(i).toFixed(2), +v.buffered.end(i).toFixed(2)])) + ', stats=' + JSON.stringify(mp && mp.statisticsInfo || {}) + ')'); return; }
     if (v.buffered.length && age - lastReport > 10000) {     // log the live delay every 10 s
       lastReport = age;
       const lat = v.buffered.end(v.buffered.length - 1) - v.currentTime;
