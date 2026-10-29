@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- Low latency (beta): optional MPEG-TS over WebSocket to LG and Fire TV, played with mpegts.js; auto-falls back to HLS. Chromecast stays on HLS. Off by default; target under ~1 s, not yet measured on TVs.
+
 ## 0.1.2
 - Runs as a system-tray app: no console window. Tray menu: Open Beamer, Quit Beamer. Launching a second time just opens the existing one.
 - Logs go to `%APPDATA%\Beamer\beamer.log`; background `adb` calls no longer flash a window.

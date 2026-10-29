@@ -1,5 +1,5 @@
 """Beamer launcher: runs the web server in the background and lives in the system tray (no console window)."""
-import asyncio, socket, sys, threading, webbrowser
+import asyncio, os, socket, sys, threading, webbrowser
 
 from aiohttp import web
 
@@ -66,6 +66,8 @@ def main(open_browser=True):
             loop.call_soon_threadsafe(box["stop"].set)
 
     try:
+        if os.environ.get("BEAMER_NO_TRAY"):      # headless (tests)
+            raise ImportError
         import pystray
         from PIL import Image
     except ImportError:               # dev install without the tray extras: just keep serving

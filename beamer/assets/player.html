@@ -7,29 +7,90 @@ video{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;backgroun
 #b{position:fixed;inset:0;width:100%;height:100%;opacity:0;border:0;background:transparent;z-index:5}
 #msg{position:fixed;left:0;right:0;bottom:6%;text-align:center;color:#fff;font:28px system-ui,sans-serif;z-index:6;text-shadow:0 0 6px #000}
 #msg b{color:#fff;background:#BB0000;padding:6px 16px;border-radius:8px}
+#mode{position:fixed;top:12px;right:16px;color:#fff;font:20px system-ui,sans-serif;z-index:6;background:#000a;padding:4px 12px;border-radius:8px;display:none}
 </style>
 <video id="v" autoplay playsinline></video>
 <button id="b" autofocus></button>
+<div id="mode"></div>
 <div id="msg"><b>Beamer</b>&nbsp; Press OK on the remote for sound + full screen</div>
 <script src="/hls.min.js"></script>
+<script src="/mpegts.js"></script>
 <script>
-const src='/hls/live.m3u8', v=document.getElementById('v'), b=document.getElementById('b'), msg=document.getElementById('msg');
-function start(){
+const q = new URLSearchParams(location.search);
+const wantLL = q.get('mode') === 'll';
+const v = document.getElementById('v'), b = document.getElementById('b'), msg = document.getElementById('msg'), modeBadge = document.getElementById('mode');
+let mode = null, mp = null, hls = null, llTimer = null;
+
+function report(m) { try { fetch('/api/log', {method: 'POST', body: JSON.stringify({msg: m}), keepalive: true}); } catch (e) {} }
+function badge(t) { mode = t; modeBadge.textContent = t; if (q.get('badge') === '1') modeBadge.style.display = 'block'; }
+function tryPlay() { v.play().catch(() => { v.muted = true; v.play().catch(() => {}); }); }
+
+// ---------- HLS (default, and the fallback) ----------
+function startHls() {
+  badge('HLS');
+  report('mode=HLS');
   if (window.Hls && Hls.isSupported()) {
-    const h=new Hls({liveSyncDurationCount:2, lowLatencyMode:false});
-    h.loadSource(src); h.attachMedia(v);
-    h.on(Hls.Events.ERROR,(e,d)=>{ if(d.fatal){ h.destroy(); setTimeout(start,1500);} });
-  } else { v.src=src; }
-  v.play().catch(()=>{ v.muted=true; v.play().catch(()=>{}); });
+    hls = new Hls({liveSyncDurationCount: 2, lowLatencyMode: false});
+    hls.loadSource('/hls/live.m3u8'); hls.attachMedia(v);
+    hls.on(Hls.Events.ERROR, (e, d) => { if (d.fatal) { report('hls fatal error: ' + d.type + '/' + d.details); hls.destroy(); setTimeout(startHls, 1500); } });
+  } else { v.src = '/hls/live.m3u8'; }
+  tryPlay();
 }
-start();
-function gesture(){
-  v.muted=false; v.volume=1;
-  if (v.paused) v.play().catch(()=>{});
-  const el=document.documentElement, fs=el.requestFullscreen||el.webkitRequestFullscreen||el.mozRequestFullScreen;
-  if (fs && !document.fullscreenElement) { try{ fs.call(el); }catch(e){} }
-  msg.style.display='none';
+
+// ---------- Low latency (MPEG-TS over WebSocket via mpegts.js) ----------
+function fallback(reason) {
+  report('falling back to HLS: ' + reason);
+  clearInterval(llTimer);
+  if (mp) { try { mp.destroy(); } catch (e) {} mp = null; }
+  startHls();
 }
-b.addEventListener('click',gesture); addEventListener('keydown',gesture); addEventListener('click',gesture);
-b.focus(); setInterval(()=>b.focus(),1000);
+
+function startLowLatency() {
+  const ok = window.mpegts && mpegts.isSupported() && mpegts.getFeatureList().mseLivePlayback;
+  if (!ok) { fallback('MSE live playback not supported'); return; }
+  badge('LOW LATENCY');
+  report('mode=low-latency (mpegts.js ' + (mpegts.version || '?') + ')');
+  mp = mpegts.createPlayer(
+    {type: 'mpegts', isLive: true, url: (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/live'},
+    {
+      enableWorker: false,
+      enableStashBuffer: false,          // hand frames to the decoder immediately
+      isLive: true,
+      lazyLoad: false,
+      liveBufferLatencyChasing: true,    // speed up slightly whenever we drift behind live
+      liveBufferLatencyMaxLatency: 1.0,  // seconds: start chasing above this...
+      liveBufferLatencyMinRemain: 0.4,   // ...and settle roughly here (~0.5 s behind live)
+      autoCleanupSourceBuffer: true, autoCleanupMaxBackwardDuration: 6, autoCleanupMinBackwardDuration: 3
+    });
+  mp.on(mpegts.Events.ERROR, (type, detail, info) => fallback('mpegts error ' + type + '/' + detail + ' ' + (info && info.msg || '')));
+  mp.attachMediaElement(v);
+  mp.load();
+  tryPlay();
+
+  // no frames within ~5 s -> HLS
+  const t0 = Date.now();
+  let lastReport = 0;
+  llTimer = setInterval(() => {
+    const age = Date.now() - t0;
+    if (age >= 5000 && !(v.readyState >= 2 && v.currentTime > 0)) { fallback('no frames within 5 s (readyState ' + v.readyState + ', t=' + v.currentTime.toFixed(2) + ', stats=' + JSON.stringify(mp && mp.statisticsInfo || {}) + ')'); return; }
+    if (v.buffered.length && age - lastReport > 10000) {     // log the live delay every 10 s
+      lastReport = age;
+      const lat = v.buffered.end(v.buffered.length - 1) - v.currentTime;
+      report('low-latency running; buffer ahead of playhead = ' + lat.toFixed(2) + ' s');
+    }
+  }, 1000);
+}
+
+if (wantLL) startLowLatency(); else startHls();
+
+function gesture() {
+  v.muted = false; v.volume = 1;
+  if (v.paused) v.play().catch(() => {});
+  const el = document.documentElement, fs = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
+  if (fs && !document.fullscreenElement) { try { fs.call(el); } catch (e) {} }
+  msg.style.display = 'none';
+}
+b.addEventListener('click', gesture); addEventListener('keydown', gesture); addEventListener('click', gesture);
+b.focus(); setInterval(() => b.focus(), 1000);
+report('player opened: ' + navigator.userAgent);
 </script>

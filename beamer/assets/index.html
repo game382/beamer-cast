@@ -38,6 +38,9 @@ video{width:100%;border-radius:10px;background:#000;margin-top:10px}
 <div class="card"><h2>2 · Quality</h2>
   <select id="q"><option value="720">720p · 30 fps (light)</option><option value="1080" selected>1080p · 30 fps</option>
   <option value="1080-60">1080p · 60 fps</option><option value="2160">4K · 30 fps (heavy)</option></select>
+  <label style="display:block;margin-top:12px;cursor:pointer"><input type="checkbox" id="ll" style="accent-color:#BB0000;width:18px;height:18px;vertical-align:middle">
+    Low latency <b>(beta)</b><small style="display:block;color:var(--silver)">Aims for under ~1 s delay on LG and Fire TV. Chromecast always uses regular streaming (HLS). Falls back to HLS automatically if a TV can't do it.</small></label>
+  <div style="margin-top:8px;font-size:14px"><a href="/clock" target="_blank" style="color:var(--silver)">Open the latency test clock</a></div>
 </div>
 <div class="card"><h2>3 · Beam it</h2>
   <div class="row"><button id="go" class="primary">Share tab / screen</button><button id="stop">Stop</button></div>
@@ -48,6 +51,8 @@ video{width:100%;border-radius:10px;background:#000;margin-top:10px}
 const $=id=>document.getElementById(id), log=h=>$('log').innerHTML=h, add=h=>$('log').innerHTML+='<br>'+h;
 const Q={'720':{h:720,fps:30,bps:3e6},'1080':{h:1080,fps:30,bps:6e6},'1080-60':{h:1080,fps:60,bps:9e6},'2160':{h:2160,fps:30,bps:2e7}};
 let ws,rec,stream;
+fetch('/api/settings').then(r=>r.json()).then(s=>{$('ll').checked=!!s.low_latency;}).catch(()=>{});
+$('ll').onchange=()=>fetch('/api/settings',{method:'POST',body:JSON.stringify({low_latency:$('ll').checked})});
 async function loadTVs(r){
   $('tvs').textContent='Searching your network...';
   const d=await(await fetch('/api/tvs'+(r?'?refresh=1':''))).json();
@@ -69,9 +74,11 @@ $('go').onclick=async()=>{
   const cfg=Q[$('q').value];
   stream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:cfg.fps,height:{ideal:cfg.h}},audio:{suppressLocalAudioPlayback:true},systemAudio:'exclude'});
   $('v').srcObject=stream;
-  ws=new WebSocket(`ws://${location.host}/ws?dev=${encodeURIComponent(picked.join(','))}&q=${$('q').value}`);
+  const ll=$('ll').checked;
+  ws=new WebSocket(`ws://${location.host}/ws?dev=${encodeURIComponent(picked.join(','))}&q=${$('q').value}&ll=${ll?1:0}`);
   ws.onopen=()=>{rec=new MediaRecorder(stream,{mimeType:'video/webm;codecs=vp8,opus',videoBitsPerSecond:cfg.bps});
-    rec.ondataavailable=e=>e.data.size&&ws.send(e.data);rec.start(250);log('Streaming... sending to your TVs.');};
+    rec.ondataavailable=e=>e.data.size&&ws.send(e.data);rec.start(ll?100:250);   // smaller chunks = less delay in low-latency mode
+    log('Streaming ('+(ll?'low latency beta':'HLS')+')... sending to your TVs.');};
   ws.onmessage=e=>add(e.data.startsWith('OK')?'<span class="ok">'+e.data+'</span>':e.data.startsWith('FAILED')?'<span class="bad">'+e.data+'</span>':e.data);
   stream.getVideoTracks()[0].onended=()=>$('stop').click();
 };
