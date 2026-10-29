@@ -17,6 +17,7 @@ Needs Inno Setup 6 (installer) and the GitHub CLI `gh` (releases). Logs of the p
 - `beamer/app.py`: launcher. Server runs on a background thread; the main thread is the tray icon (pystray).
 - `beamer/server.py`: aiohttp web app. `/ws` receives MediaRecorder chunks -> ffmpeg -> HLS in a temp dir;
   `/api/tvs` lists TVs; `/api/tvs/add` pairs one; `/player` is the page the TV opens.
+- `beamer/live.py`: LiveHub fans MPEG-TS from ffmpeg stdout to WebSocket `/live` clients (low-latency beta; keyframe-aligned joins, slow clients dropped at 2 MB).
 - `beamer/drivers.py`: one driver per TV kind (`lg`, `fire`, `cast`, `roku`). Add a TV type by adding
   `open_<kind>` (+ `pair_<kind>`) and registering it in `DRIVERS` and in `server.add_handler`.
 - `beamer/config.py`: per-user settings in `%APPDATA%\Beamer\config.json`; downloads ffmpeg/adb on first use.
@@ -30,6 +31,7 @@ Needs Inno Setup 6 (installer) and the GitHub CLI `gh` (releases). Logs of the p
 | Fire TV (adb + Silk) | tested; needs ADB debugging on; stale `offline` links are auto-reset |
 | Chromecast / Google TV | implemented, untested on hardware |
 | Roku | unsupported (no browser; my guessed ECP play command returned 404; AirPlay pairing was refused) |
+| Low latency (beta, LG + Fire TV) | built in 0.1.3; Fire TV ran it fine; delay not yet measured, LG untested |
 | Several TVs at once | implemented, untested |
 | Chrome Cast-menu receiver | not built: Cast senders demand Google device-auth and drop a self-signed receiver |
 

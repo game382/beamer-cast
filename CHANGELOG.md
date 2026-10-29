@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.3
 - Low latency (beta): optional MPEG-TS over WebSocket to LG and Fire TV, played with mpegts.js; auto-falls back to HLS. Chromecast stays on HLS. Off by default; target under ~1 s, not yet measured on TVs.
 
 ## 0.1.2
