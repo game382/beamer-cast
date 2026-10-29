@@ -17,7 +17,7 @@ async def main():
     tone = subprocess.Popen(['ffplay', '-nodisp', '-loglevel', 'quiet', '-autoexit', '-t', str(SECS + 6), '-volume', '15', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000'])
     chunks, msgs = [], []
     async with aiohttp.ClientSession() as s:
-        ctl = await s.ws_connect(f"ws://127.0.0.1:{PORT}/native?ll=1&q=1080&dev=&snd=1&mute=0", max_msg_size=0)
+        ctl = await s.ws_connect(f"ws://127.0.0.1:{PORT}/native?ll=1&q=1080&dev=&snd=1&mute={os.environ.get("MUTE","0")}", max_msg_size=0)
         t0 = time.time()
         await asyncio.sleep(3)
         live = await s.ws_connect(f"ws://127.0.0.1:{PORT}/live", max_msg_size=0)
