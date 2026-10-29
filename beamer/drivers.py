@@ -108,11 +108,21 @@ async def _adb(*args):
     return out.decode(errors="ignore").strip()
 
 
-async def pair_fire(host):
-    target = f"{host}:5555"
+async def _adb_connect(target):
+    """Connect to the TV over ADB, recovering from stale 'offline' links (common after the TV sleeps)."""
     out = await _adb("connect", target)
     state = await _adb("-s", target, "get-state")
-    if "device" not in state:
+    if state.strip() != "device":
+        await _adb("disconnect", target)
+        out = await _adb("connect", target)
+        state = await _adb("-s", target, "get-state")
+    return out, state.strip()
+
+
+async def pair_fire(host):
+    target = f"{host}:5555"
+    out, state = await _adb_connect(target)
+    if state != "device":
         hint = ("Accept the 'Allow USB debugging?' prompt on the TV (tick Always allow), then try again."
                 if "authenticate" in out or "unauthorized" in state else
                 "Turn on ADB debugging in the TV's Developer options (Settings > My Fire TV), then try again.")
@@ -123,10 +133,9 @@ async def pair_fire(host):
 
 async def open_fire(tv, url, player_url):
     target = f"{tv['host']}:5555"
-    out = await _adb("connect", target)
-    state = await _adb("-s", target, "get-state")
-    if "device" not in state:
-        raise RuntimeError(f"ADB not connected/authorized ({out} / {state}). Is the TV on, with ADB debugging enabled?")
+    out, state = await _adb_connect(target)
+    if state != "device":
+        raise RuntimeError(f"ADB is {state or 'not connected'} ({out}). Turn the TV on and make sure ADB debugging is enabled, then try again.")
     await _adb("-s", target, "shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", player_url, "com.amazon.cloud9")
     # Silk won't autoplay with sound until a real key event arrives; OK (DPAD_CENTER) also triggers fullscreen.
     for delay in (6, 8):
