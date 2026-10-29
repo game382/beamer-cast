@@ -1,6 +1,6 @@
 ; Inno Setup script. Build with: ISCC installer\beamer.iss   (after PyInstaller has produced dist\Beamer)
 #define AppName "Beamer"
-#define AppVersion "0.1.3"
+#define AppVersion "0.1.4"
 
 [Setup]
 AppId={{B3A4E1D2-5C6F-4A7B-9D10-BEA3E2C0FFEE}
