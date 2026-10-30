@@ -13,7 +13,7 @@ stream that the TV plays. Several TVs can play the same stream at once.
 |---|---|---|
 | **LG webOS** | Opens the TV's built-in web browser on a player page (one-time pairing prompt on the TV) | Tested |
 | **Amazon Fire TV** (incl. Toshiba/Insignia Fire TV Edition) | Uses `adb` to open the Silk browser on a player page (needs ADB debugging on) | Tested |
-| **Chromecast / Google TV** | Real Cast protocol with Google's default receiver | Implemented, **not yet tested on hardware** |
+| **Chromecast / Google TV** | Real Cast protocol with Google's default receiver | Chromecast: tested. Google TV (onn): **not yet tested** |
 | **Roku TV / player** | Roku has no web browser | **Not supported yet** (detected, shown greyed out) |
 | Samsung / Tizen, Apple TV | - | Not supported |
 

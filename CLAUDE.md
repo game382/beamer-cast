@@ -30,7 +30,8 @@ Needs Inno Setup 6 (installer) and the GitHub CLI `gh` (releases). Logs of the p
 |---|---|
 | LG webOS | tested |
 | Fire TV (adb + Silk) | tested; needs ADB debugging on; stale `offline` links are auto-reset |
-| Chromecast / Google TV | implemented, untested on hardware |
+| Chromecast | tested (Bedroom TV, plain Chromecast, HLS) |
+| Google TV (onn 4K, `W4K65M`) | untested: Cast/ADB ports closed from the PC while in standby; wake the TV and retry |
 | Roku | unsupported (no browser; my guessed ECP play command returned 404; AirPlay pairing was refused) |
 | Low latency (beta, LG + Fire TV) | 0.1.3+; Fire TV ran it fine; delay not yet measured, LG untested |
 | Native screen capture + PC sound (beta) | 0.1.4; Fire TV tested (720p); LG and 1080p on Fire TV (decoder struggled once) untested |

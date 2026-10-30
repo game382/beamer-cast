@@ -52,9 +52,10 @@ def ffmpeg_command(ffmpeg, height, fps, rate, low_latency, native=None, audio=No
                 "-bf", "0", "-g", str(fps), "-keyint_min", str(fps), "-sc_threshold", "0",
                 "-b:v", rate, "-maxrate", rate, "-bufsize", rate,
                 "-c:a", "aac", "-b:a", "128k"]
-    hls = "hls_time=1:hls_list_size=6:hls_flags=delete_segments+independent_segments"
+    # 2 s segments, 10 listed: the Cast receiver stalls at the live edge with 1 s segments
+    hls = "hls_time=2:hls_list_size=10:hls_flags=delete_segments+independent_segments"
     if not low_latency:
-        return cmd + ["-f", "hls", "-hls_time", "1", "-hls_list_size", "6",
+        return cmd + ["-f", "hls", "-hls_time", "2", "-hls_list_size", "10",
                       "-hls_flags", "delete_segments+independent_segments", "live.m3u8"]
     maps = ["-map", "0:v:0"] + (["-map", "1:a:0"] if audio is not None else [] if native is not None else ["-map", "0:a:0?"])
     return cmd + maps + ["-flush_packets", "1", "-muxdelay", "0", "-f", "tee",
