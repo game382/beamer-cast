@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.5
+- Browser screen capture option: avoids Chrome tab-sharing bar on fullscreen content
+
 ## 0.1.4
 - New: Native screen capture (beta). Pick it under Capture method to cast your whole screen using Intel Quick Sync (falls back to software encoding on PCs without it). Optional PC sound sent to the TV, with an option to mute the PC while casting (it unmutes when you stop, and after a crash on the next start).
 - Low latency player: no longer falls back to HLS by mistake after a brief stall.
@@ -18,3 +21,4 @@
 
 ## 0.1.0
 - First release: browser tab/screen -> HLS -> LG webOS and Amazon Fire TV (tested); Chromecast (untested); multi-TV and quality menu; Ohio State themed UI; Windows installer.
+

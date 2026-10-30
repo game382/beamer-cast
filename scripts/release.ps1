@@ -28,7 +28,7 @@ $py = ".venv\Scripts\python.exe"
 # 2. changelog entry (newest first)
 $log = Get-Content CHANGELOG.md -Raw
 $entry = "# Changelog`r`n`r`n## $Version`r`n- $Notes`r`n"
-Set-Content CHANGELOG.md ($log -replace '^# Changelog\s*', $entry + "`r`n")
+Set-Content CHANGELOG.md ($log -replace '^# Changelog\s*', ($entry + "`r`n"))
 
 # 3. build
 & $py -m PyInstaller beamer.spec --noconfirm
